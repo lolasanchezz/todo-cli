@@ -7,7 +7,9 @@ import (
 	"log"
 	"os"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type todoItem struct {
@@ -16,12 +18,30 @@ type todoItem struct {
 }
 
 type model struct {
-	todos    []todoItem
-	cursor   int
-	selected map[int]struct{}
+	todos     []todoItem
+	cursor    int
+	selected  map[int]struct{}
+	textInput textinput.Model
 }
 
+var style = lipgloss.NewStyle().
+	Bold(true).
+	Foreground(lipgloss.Color("#FAFAFA")).
+	//Background(lipgloss.Color("#7D56F4")).
+	PaddingTop(2).
+	PaddingLeft(4).
+	Width(22).
+	Align(lipgloss.Center)
+
 func main() {
+
+	f, err := tea.LogToFile("debug.log", "debug")
+	if err != nil {
+		fmt.Println("fatal:", err)
+		os.Exit(1)
+	}
+	defer f.Close()
+
 	fmt.Print("hii")
 	p := tea.NewProgram(initialModel())
 	if _, err := p.Run(); err != nil {
@@ -31,10 +51,16 @@ func main() {
 }
 
 func initialModel() model {
-
+	ti := textinput.New()
+	ti.Placeholder = "new todo"
+	ti.Focus()
+	ti.CharLimit = 156
+	ti.Width = 20
 	return model{
-		todos:    readFromFile(),
-		selected: make(map[int]struct{}),
+		todos:     readFromFile(),
+		selected:  make(map[int]struct{}),
+		cursor:    0,
+		textInput: ti,
 	}
 
 }
@@ -63,13 +89,14 @@ func er(Error error) {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	//qvar cmd tea.Cmd
 
 	switch msg := msg.(type) {
 
 	case tea.KeyMsg:
 
 		switch msg.String() {
-		case "ctrl+c", "q":
+		case "ctrl+c", "esc":
 			return m, tea.Quit
 		case "up":
 			if m.cursor > 0 {
@@ -80,10 +107,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor++
 			}
 		case "enter":
+			if m.cursor == len(m.todos) {
+				m.todos = append(m.todos, todoItem{Name: m.textInput.Value()})
+			}
 			m.todos[m.cursor].Completed = !(m.todos[m.cursor].Completed)
+		case "backspace":
+			//m.todos[m.cursor].Name = "hello"
+			if m.cursor < len(m.todos) {
+				m.todos[m.cursor] = m.todos[len(m.todos)-1]
+				m.todos = append(m.todos[:m.cursor], m.todos[m.cursor+1:]...)
+			}
 		}
 
 	}
+	if m.cursor == len(m.todos) {
+		m.textInput, _ = m.textInput.Update(msg)
+	}
+
 	return m, nil
 
 }
@@ -101,8 +141,12 @@ func (m model) View() string {
 		if todo.Completed {
 			completed = "X"
 		}
-		s += fmt.Sprintf("%s [%s] %s\n", cursor, completed, todo.Name)
+		s += fmt.Sprintf("%s [%s] %s \n", cursor, completed, todo.Name)
 	}
+	if m.cursor == len(m.todos) {
+		s += fmt.Sprintf(m.textInput.View())
+	}
+	s = style.Render(s)
 	return s
 
 }
