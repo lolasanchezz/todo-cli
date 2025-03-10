@@ -79,6 +79,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor < len(m.todos) {
 				m.cursor++
 			}
+		case "enter":
+			m.todos[m.cursor].Completed = !(m.todos[m.cursor].Completed)
 		}
 
 	}
